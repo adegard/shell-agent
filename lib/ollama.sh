@@ -74,7 +74,6 @@ ollama_chat() {
 {
   "model": "${OLLAMA_MODEL}",
   "messages": [${messages_json}],
-  "tools": ${OLLAMA_TOOLS_JSON},
   "stream": false,
   "options": {
     "num_ctx": ${CONTEXT_WINDOW},
@@ -84,15 +83,34 @@ ollama_chat() {
 EOF
 )
 
-    local response
-    response=$(curl -s --max-time "${OLLAMA_TIMEOUT}" \
+    if [[ "${DEBUG:-0}" == "1" ]]; then
+        echo "[DEBUG] Sending payload to ${OLLAMA_HOST}/v1/chat/completions" >&2
+        echo "$payload" | jq . 2>/dev/null >&2
+    fi
+
+    local response http_code
+    response=$(curl -s -w "\n%{http_code}" --max-time "${OLLAMA_TIMEOUT}" \
         "${OLLAMA_HOST}/v1/chat/completions" \
         -H "Content-Type: application/json" \
         -d "$payload" 2>&1)
 
-    if [[ $? -ne 0 ]] || [[ -z "$response" ]]; then
-        echo "ERROR: Failed to reach Ollama at ${OLLAMA_HOST}" >&2
+    http_code=$(echo "$response" | tail -1)
+    response=$(echo "$response" | sed '$d')
+
+    if [[ "$http_code" != "200" ]]; then
+        echo "ERROR: Ollama returned HTTP ${http_code}" >&2
+        echo "$response" >&2
         return 1
+    fi
+
+    if [[ -z "$response" ]] || [[ "$response" == "null" ]]; then
+        echo "ERROR: Empty response from Ollama" >&2
+        return 1
+    fi
+
+    if [[ "${DEBUG:-0}" == "1" ]]; then
+        echo "[DEBUG] Response:" >&2
+        echo "$response" | jq . 2>/dev/null >&2
     fi
 
     echo "$response"

@@ -16,15 +16,32 @@ SINGLE_PROMPT=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -m|--model) OLLAMA_MODEL="$2"; shift 2 ;;
+        -d|--debug) export DEBUG=1; shift ;;
+        -t|--test)
+            echo "Testing Ollama connection..."
+            if curl -sf "${OLLAMA_HOST}/api/tags" | jq -r '.models[].name' 2>/dev/null; then
+                echo "Ollama is running. Sending test prompt..."
+                add_message "system" "You are a helpful assistant. Reply with one word."
+                add_message "user" "Say hello"
+                response=$(ollama_chat 2>&1)
+                echo "Response: $(extract_content "$response")"
+            else
+                echo "Cannot reach Ollama at ${OLLAMA_HOST}"
+            fi
+            exit 0
+            ;;
         -h|--help)
-            echo "Usage: agent.sh [-m model] [prompt]"
+            echo "Usage: agent.sh [-m model] [-d] [-t] [prompt]"
             echo "  -m, --model   Override Ollama model"
+            echo "  -d, --debug   Show debug output"
+            echo "  -t, --test    Test Ollama connection"
             echo "  -h, --help    Show this help"
             echo ""
             echo "Env vars:"
             echo "  OLLAMA_HOST    Ollama server URL (default: http://127.0.0.1:11434)"
             echo "  OLLAMA_MODEL   Model name (default: qwen2.5-coder:1.5b)"
             echo "  WORKSPACE      Working directory (default: cwd)"
+            echo "  DEBUG=1        Enable debug output"
             exit 0
             ;;
         *) SINGLE_PROMPT="$1"; shift ;;
@@ -152,16 +169,32 @@ run_agent() {
     local iteration=0
     while (( iteration < MAX_ITERATIONS )); do
         iteration=$((iteration + 1))
-        echo -ne "${C_DIM}thinking...${C_RESET}\r"
+        echo -ne "${C_DIM}[${iteration}/${MAX_ITERATIONS}] thinking...${C_RESET}\r" >&2
 
         local response
-        response=$(ollama_chat) || {
-            echo -e "${C_RED}Failed to contact Ollama${C_RESET}"
+        response=$(ollama_chat 2>&1) || {
+            echo ""
+            echo -e "${C_RED}Failed to contact Ollama:${C_RESET}"
+            echo "$response" | head -5
             return 1
         }
 
+        # Check for error prefix from curl
+        if [[ "$response" == ERROR:* ]]; then
+            echo ""
+            echo -e "${C_RED}${response}${C_RESET}"
+            return 1
+        fi
+
         local content
         content=$(extract_content "$response")
+
+        if [[ -z "$content" ]]; then
+            echo ""
+            echo -e "${C_YELLOW}Empty response from model. Raw response:${C_RESET}"
+            echo "$response" | head -10
+            return 1
+        fi
 
         if has_tool_call "$response"; then
             # Parse and execute tool
