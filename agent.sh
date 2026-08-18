@@ -11,6 +11,15 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# ── Load modules (before arg parsing so vars are set) ───────────────────────
+source "${SCRIPT_DIR}/lib/config.sh"
+source "${SCRIPT_DIR}/lib/ollama.sh"
+
+# Load all tool implementations
+for tool_file in "${SCRIPT_DIR}/tools/"*.sh; do
+    [[ -f "$tool_file" ]] && source "$tool_file"
+done
+
 # ── Parse args ──────────────────────────────────────────────────────────────
 SINGLE_PROMPT=""
 while [[ $# -gt 0 ]]; do
@@ -50,15 +59,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         *) SINGLE_PROMPT="$1"; shift ;;
     esac
-done
-
-# ── Load modules ────────────────────────────────────────────────────────────
-source "${SCRIPT_DIR}/lib/config.sh"
-source "${SCRIPT_DIR}/lib/ollama.sh"
-
-# Load all tool implementations
-for tool_file in "${SCRIPT_DIR}/tools/"*.sh; do
-    [[ -f "$tool_file" ]] && source "$tool_file"
 done
 
 # ── Check Ollama is running ─────────────────────────────────────────────────
