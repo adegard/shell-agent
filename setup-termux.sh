@@ -70,7 +70,6 @@ else
     curl -fsSL -o "${TMPDIR}/ollama.tar.zst" "${DOWNLOAD_URL}"
 
     info "Extracting..."
-    # Termux has zstd, fallback to tar if zstd not available
     if command -v zstd &>/dev/null; then
         zstd -d "${TMPDIR}/ollama.tar.zst" -o "${TMPDIR}/ollama.tar"
     else
@@ -78,7 +77,21 @@ else
         zstd -d "${TMPDIR}/ollama.tar.zst" -o "${TMPDIR}/ollama.tar"
     fi
     tar -xf "${TMPDIR}/ollama.tar" -C "${TMPDIR}"
-    mv "${TMPDIR}/ollama" "${OLLAMA_BIN}"
+
+    # Find the ollama binary (may be at root or bin/ollama)
+    OLLAMA_FOUND=$(find "${TMPDIR}" -name "ollama" -type f -executable 2>/dev/null | head -1)
+    if [[ -z "$OLLAMA_FOUND" ]]; then
+        # Try without executable flag
+        OLLAMA_FOUND=$(find "${TMPDIR}" -name "ollama" -type f 2>/dev/null | head -1)
+    fi
+    if [[ -z "$OLLAMA_FOUND" ]]; then
+        err "Could not find ollama binary in the archive"
+        ls -la "${TMPDIR}" 2>/dev/null
+        rm -rf "${TMPDIR}"
+        exit 1
+    fi
+
+    mv "${OLLAMA_FOUND}" "${OLLAMA_BIN}"
     chmod +x "${OLLAMA_BIN}"
     rm -rf "${TMPDIR}"
 
