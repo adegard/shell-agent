@@ -43,64 +43,74 @@ mkdir -p "${HOME}/.local/bin"
 if command -v ollama &>/dev/null || [[ -x "$OLLAMA_BIN" ]]; then
     ok "Ollama already installed"
 else
-    info "Downloading Ollama for aarch64-linux..."
-
-    # Detect architecture
-    ARCH=$(uname -m)
-    case "$ARCH" in
-        aarch64|arm64) OLLAMA_ARCH="arm64" ;;
-        armv7l|armhf)  OLLAMA_ARCH="arm" ;;
-        x86_64)        OLLAMA_ARCH="amd64" ;;
-        *)             err "Unsupported architecture: $ARCH"; exit 1 ;;
-    esac
-
-    # Find the correct asset URL for this architecture
-    DOWNLOAD_URL=$(curl -fsSL https://api.github.com/repos/ollama/ollama/releases/latest \
-        | jq -r --arg arch "$OLLAMA_ARCH" '
-            .assets[] | select(.name == "ollama-linux-\($arch).tar.zst") | .browser_download_url
-        ' 2>/dev/null)
-
-    if [[ -z "$DOWNLOAD_URL" ]]; then
-        err "Could not find Ollama download for architecture: ${OLLAMA_ARCH}"
-        exit 1
-    fi
-
-    info "Fetching: ${DOWNLOAD_URL}"
-    TMPDIR=$(mktemp -d)
-    curl -fsSL -o "${TMPDIR}/ollama.tar.zst" "${DOWNLOAD_URL}"
-
-    info "Extracting..."
-    if command -v zstd &>/dev/null; then
-        zstd -d "${TMPDIR}/ollama.tar.zst" -o "${TMPDIR}/ollama.tar"
+    # Method 1: Try Termux package (smallest, fastest)
+    if pkg install -y ollama 2>/dev/null && command -v ollama &>/dev/null; then
+        ok "Ollama installed via pkg"
     else
-        pkg install -y zstd 2>/dev/null || true
-        zstd -d "${TMPDIR}/ollama.tar.zst" -o "${TMPDIR}/ollama.tar"
-    fi
-    tar -xf "${TMPDIR}/ollama.tar" -C "${TMPDIR}"
+        # Method 2: Download binary from GitHub releases
+        ARCH=$(uname -m)
+        case "$ARCH" in
+            aarch64|arm64) OLLAMA_ARCH="arm64" ;;
+            armv7l|armhf)  OLLAMA_ARCH="arm" ;;
+            x86_64)        OLLAMA_ARCH="amd64" ;;
+            *)             err "Unsupported architecture: $ARCH"; exit 1 ;;
+        esac
 
-    # Find the ollama binary (may be at root or bin/ollama)
-    OLLAMA_FOUND=$(find "${TMPDIR}" -name "ollama" -type f -executable 2>/dev/null | head -1)
-    if [[ -z "$OLLAMA_FOUND" ]]; then
-        # Try without executable flag
+        DOWNLOAD_URL=$(curl -fsSL https://api.github.com/repos/ollama/ollama/releases/latest \
+            | jq -r --arg arch "$OLLAMA_ARCH" '
+                .assets[] | select(.name == "ollama-linux-\($arch).tar.zst") | .browser_download_url
+            ' 2>/dev/null)
+
+        if [[ -z "$DOWNLOAD_URL" ]]; then
+            err "Could not find Ollama download for: ${OLLAMA_ARCH}"
+            exit 1
+        fi
+
+        # Ensure wget and zstd are available
+        pkg install -y wget zstd 2>/dev/null || true
+
+        OLLAMA_DL_DIR="${HOME}/.local/share/ollama-dl"
+        mkdir -p "${OLLAMA_DL_DIR}"
+        ARCHIVE="${OLLAMA_DL_DIR}/ollama.tar.zst"
+
+        # Download with resume support (handles connection drops)
+        info "Downloading Ollama (~2GB, uses resume on retry)..."
+        info "URL: ${DOWNLOAD_URL}"
+        for attempt in 1 2 3 4 5; do
+            info "Attempt ${attempt}/5..."
+            if wget -c --tries=2 --timeout=60 \
+                --progress=dot:giga \
+                -O "${ARCHIVE}" "${DOWNLOAD_URL}" 2>&1; then
+                break
+            fi
+            warn "Download interrupted on attempt ${attempt}, resuming..."
+            sleep 2
+        done
+
+        if [[ ! -s "${ARCHIVE}" ]]; then
+            err "Download failed after 5 attempts"
+            err "You can manually download and place ollama binary in ~/.local/bin/"
+            exit 1
+        fi
+
+        info "Extracting..."
+        TMPDIR=$(mktemp -d)
+        zstd -d "${ARCHIVE}" -o "${TMPDIR}/ollama.tar" 2>/dev/null
+        tar -xf "${TMPDIR}/ollama.tar" -C "${TMPDIR}"
+
         OLLAMA_FOUND=$(find "${TMPDIR}" -name "ollama" -type f 2>/dev/null | head -1)
-    fi
-    if [[ -z "$OLLAMA_FOUND" ]]; then
-        err "Could not find ollama binary in the archive"
-        ls -la "${TMPDIR}" 2>/dev/null
+        if [[ -z "$OLLAMA_FOUND" ]]; then
+            err "Could not find ollama binary in archive"
+            ls -la "${TMPDIR}" 2>/dev/null
+            rm -rf "${TMPDIR}"
+            exit 1
+        fi
+
+        mv "${OLLAMA_FOUND}" "${OLLAMA_BIN}"
+        chmod +x "${OLLAMA_BIN}"
         rm -rf "${TMPDIR}"
-        exit 1
+        ok "Ollama installed to ${OLLAMA_BIN}"
     fi
-
-    mv "${OLLAMA_FOUND}" "${OLLAMA_BIN}"
-    chmod +x "${OLLAMA_BIN}"
-    rm -rf "${TMPDIR}"
-
-    # Make sure ~/.local/bin is in PATH
-    if ! echo "$PATH" | grep -q "${HOME}/.local/bin"; then
-        export PATH="${HOME}/.local/bin:$PATH"
-    fi
-
-    ok "Ollama installed to ${OLLAMA_BIN}"
 fi
 
 # ── 3. Configure storage ────────────────────────────────────────────────────
