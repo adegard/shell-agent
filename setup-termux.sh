@@ -114,9 +114,13 @@ else
 fi
 
 # ── 3. Configure storage ────────────────────────────────────────────────────
-info "Requesting storage access..."
-termux-setup-storage 2>/dev/null || warn "termux-setup-storage failed (may already be configured)"
-ok "Storage access configured"
+if [[ -d "${HOME}/storage" ]]; then
+    ok "Storage already configured"
+else
+    info "Requesting storage access..."
+    yes | termux-setup-storage 2>/dev/null || warn "termux-setup-storage skipped"
+    ok "Storage access configured"
+fi
 
 # ── 4. Start Ollama and pull model ──────────────────────────────────────────
 info "Starting Ollama server..."
