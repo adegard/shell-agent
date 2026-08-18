@@ -31,6 +31,7 @@ pkg install -y \
     python nodejs \
     clang make \
     openssh \
+    zstd \
     termux-api 2>/dev/null || true
 
 ok "System packages installed"
@@ -53,12 +54,33 @@ else
         *)             err "Unsupported architecture: $ARCH"; exit 1 ;;
     esac
 
-    OLLAMA_VERSION=$(curl -fsSL https://api.github.com/repos/ollama/ollama/releases/latest | jq -r '.tag_name' 2>/dev/null || echo "latest")
-    DOWNLOAD_URL="https://github.com/ollama/ollama/releases/latest/download/ollama-linux-${OLLAMA_ARCH}"
+    # Find the correct asset URL for this architecture
+    DOWNLOAD_URL=$(curl -fsSL https://api.github.com/repos/ollama/ollama/releases/latest \
+        | jq -r --arg arch "$OLLAMA_ARCH" '
+            .assets[] | select(.name == "ollama-linux-\($arch).tar.zst") | .browser_download_url
+        ' 2>/dev/null)
+
+    if [[ -z "$DOWNLOAD_URL" ]]; then
+        err "Could not find Ollama download for architecture: ${OLLAMA_ARCH}"
+        exit 1
+    fi
 
     info "Fetching: ${DOWNLOAD_URL}"
-    curl -fsSL -o "${OLLAMA_BIN}" "${DOWNLOAD_URL}"
+    TMPDIR=$(mktemp -d)
+    curl -fsSL -o "${TMPDIR}/ollama.tar.zst" "${DOWNLOAD_URL}"
+
+    info "Extracting..."
+    # Termux has zstd, fallback to tar if zstd not available
+    if command -v zstd &>/dev/null; then
+        zstd -d "${TMPDIR}/ollama.tar.zst" -o "${TMPDIR}/ollama.tar"
+    else
+        pkg install -y zstd 2>/dev/null || true
+        zstd -d "${TMPDIR}/ollama.tar.zst" -o "${TMPDIR}/ollama.tar"
+    fi
+    tar -xf "${TMPDIR}/ollama.tar" -C "${TMPDIR}"
+    mv "${TMPDIR}/ollama" "${OLLAMA_BIN}"
     chmod +x "${OLLAMA_BIN}"
+    rm -rf "${TMPDIR}"
 
     # Make sure ~/.local/bin is in PATH
     if ! echo "$PATH" | grep -q "${HOME}/.local/bin"; then
