@@ -40,14 +40,22 @@ ok "System packages installed"
 OLLAMA_BIN="${HOME}/.local/bin/ollama"
 mkdir -p "${HOME}/.local/bin"
 
-if command -v ollama &>/dev/null || [[ -x "$OLLAMA_BIN" ]]; then
-    ok "Ollama already installed"
+if command -v ollama &>/dev/null; then
+    OLLAMA_BIN="$(command -v ollama)"
+    ok "Ollama already installed at ${OLLAMA_BIN}"
+elif [[ -x "$OLLAMA_BIN" ]]; then
+    ok "Ollama already installed at ${OLLAMA_BIN}"
 else
-    # Method 1: Try Termux package (smallest, fastest)
-    if pkg install -y ollama 2>/dev/null && command -v ollama &>/dev/null; then
-        ok "Ollama installed via pkg"
-    else
-        # Method 2: Download binary from GitHub releases
+    # Method 1: Try Termux package
+    if pkg install -y ollama 2>/dev/null; then
+        if command -v ollama &>/dev/null; then
+            OLLAMA_BIN="$(command -v ollama)"
+            ok "Ollama installed via pkg at ${OLLAMA_BIN}"
+        fi
+    fi
+
+    # Method 2: Download binary from GitHub releases
+    if ! command -v ollama &>/dev/null && ! [[ -x "$OLLAMA_BIN" ]]; then
         ARCH=$(uname -m)
         case "$ARCH" in
             aarch64|arm64) OLLAMA_ARCH="arm64" ;;
@@ -111,6 +119,19 @@ else
         rm -rf "${TMPDIR}"
         ok "Ollama installed to ${OLLAMA_BIN}"
     fi
+fi
+
+# Final check: make sure we have a working ollama binary
+if ! command -v ollama &>/dev/null && ! [[ -x "$OLLAMA_BIN" ]]; then
+    err "Ollama installation failed — binary not found"
+    err "Try installing manually:"
+    err "  pkg install ollama"
+    err "  or download from https://github.com/ollama/ollama/releases"
+    exit 1
+fi
+# Update OLLAMA_BIN if ollama is in PATH but not at our custom path
+if command -v ollama &>/dev/null; then
+    OLLAMA_BIN="$(command -v ollama)"
 fi
 
 # ── 3. Configure storage ────────────────────────────────────────────────────
