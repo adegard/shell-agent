@@ -10,6 +10,7 @@ Paste this into Termux:
 pkg update -y && pkg install -y git && git clone https://github.com/adegard/shell-agent.git && bash shell-agent/setup-termux.sh
 ```
 
+[Wait and relax... it takes time] 
 That's it. It installs Ollama, pulls a coding model, and sets up the agent.
 
 ## After install
