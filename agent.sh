@@ -18,16 +18,20 @@ while [[ $# -gt 0 ]]; do
         -m|--model) OLLAMA_MODEL="$2"; shift 2 ;;
         -d|--debug) export DEBUG=1; shift ;;
         -t|--test)
-            echo "Testing Ollama connection..."
-            if curl -sf "${OLLAMA_HOST}/api/tags" | jq -r '.models[].name' 2>/dev/null; then
-                echo "Ollama is running. Sending test prompt..."
-                add_message "system" "You are a helpful assistant. Reply with one word."
-                add_message "user" "Say hello"
-                response=$(ollama_chat 2>&1)
-                echo "Response: $(extract_content "$response")"
-            else
-                echo "Cannot reach Ollama at ${OLLAMA_HOST}"
+            echo "Testing Ollama at ${OLLAMA_HOST}..."
+            if ! curl -sf "${OLLAMA_HOST}/api/tags" >/dev/null 2>&1; then
+                echo "Cannot reach Ollama. Is it running? Try: ollama serve &"
+                exit 1
             fi
+            echo "Ollama is running. Models:"
+            curl -sf "${OLLAMA_HOST}/api/tags" | jq -r '.models[].name' 2>/dev/null
+            echo ""
+            echo "Testing model ${OLLAMA_MODEL}..."
+            echo 'Sending: {"model":"'"${OLLAMA_MODEL}"'","messages":[{"role":"user","content":"say hi"}],"stream":false}'
+            RESP=$(curl -s --max-time 60 "${OLLAMA_HOST}/api/chat" \
+                -H "Content-Type: application/json" \
+                -d '{"model":"'"${OLLAMA_MODEL}"'","messages":[{"role":"user","content":"say hi"}],"stream":false}' 2>&1)
+            echo "Response: $(echo "$RESP" | jq -r '.message.content // .error // empty' 2>/dev/null || echo "$RESP")"
             exit 0
             ;;
         -h|--help)

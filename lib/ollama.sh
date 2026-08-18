@@ -64,7 +64,7 @@ json_escape() {
     printf '%s' "$s"
 }
 
-# Send chat completion request to Ollama
+# Send chat request to Ollama (native API, more reliable than OpenAI compat)
 ollama_chat() {
     local messages_json
     messages_json=$(printf '%s\n' "${OLLAMA_MESSAGES[@]}" | paste -sd, -)
@@ -84,13 +84,12 @@ EOF
 )
 
     if [[ "${DEBUG:-0}" == "1" ]]; then
-        echo "[DEBUG] Sending payload to ${OLLAMA_HOST}/v1/chat/completions" >&2
-        echo "$payload" | jq . 2>/dev/null >&2
+        echo "[DEBUG] POST ${OLLAMA_HOST}/api/chat" >&2
     fi
 
     local response http_code
     response=$(curl -s -w "\n%{http_code}" --max-time "${OLLAMA_TIMEOUT}" \
-        "${OLLAMA_HOST}/v1/chat/completions" \
+        "${OLLAMA_HOST}/api/chat" \
         -H "Content-Type: application/json" \
         -d "$payload" 2>&1)
 
@@ -99,7 +98,7 @@ EOF
 
     if [[ "$http_code" != "200" ]]; then
         echo "ERROR: Ollama returned HTTP ${http_code}" >&2
-        echo "$response" >&2
+        echo "$response" | head -5 >&2
         return 1
     fi
 
@@ -109,16 +108,23 @@ EOF
     fi
 
     if [[ "${DEBUG:-0}" == "1" ]]; then
-        echo "[DEBUG] Response:" >&2
-        echo "$response" | jq . 2>/dev/null >&2
+        echo "[DEBUG] Response OK ($(echo "$response" | wc -c) bytes)" >&2
     fi
 
     echo "$response"
 }
 
-# Extract the assistant message content from response
+# Extract the assistant message content from response (native Ollama API)
 extract_content() {
     local response="$1"
+    # Native API: .message.content
+    local content
+    content=$(echo "$response" | jq -r '.message.content // empty' 2>/dev/null)
+    if [[ -n "$content" ]]; then
+        echo "$content"
+        return
+    fi
+    # OpenAI compat fallback: .choices[0].message.content
     echo "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null
 }
 
