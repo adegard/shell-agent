@@ -53,7 +53,7 @@ add_message() {
     OLLAMA_MESSAGES+=("{\"role\":\"${role}\",\"content\":$(json_escape "$content")}")
 }
 
-# Escape string for JSON
+# Escape string for JSON (with surrounding quotes)
 json_escape() {
     local s="$1"
     s="${s//\\/\\\\}"
@@ -61,7 +61,7 @@ json_escape() {
     s="${s//$'\n'/\\n}"
     s="${s//$'\t'/\\t}"
     s="${s//$'\r'/\\r}"
-    printf '%s' "$s"
+    printf '"%s"' "$s"
 }
 
 # Send chat request to Ollama (native API, more reliable than OpenAI compat)
