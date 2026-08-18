@@ -1,0 +1,15 @@
+{
+  "type": "function",
+  "function": {
+    "name": "write_file",
+    "description": "Write content to a file, creating directories if needed",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "File path to write"},
+        "content": {"type": "string", "description": "Content to write"}
+      },
+      "required": ["path", "content"]
+    }
+  }
+}

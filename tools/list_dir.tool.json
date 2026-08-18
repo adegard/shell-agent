@@ -1,0 +1,13 @@
+{
+  "type": "function",
+  "function": {
+    "name": "list_dir",
+    "description": "List contents of a directory",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "Directory path (default: current)"}
+      }
+    }
+  }
+}

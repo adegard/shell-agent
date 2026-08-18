@@ -1,0 +1,16 @@
+{
+  "type": "function",
+  "function": {
+    "name": "edit_file",
+    "description": "Replace a string in a file with new content",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "File path to edit"},
+        "old_string": {"type": "string", "description": "String to find and replace"},
+        "new_string": {"type": "string", "description": "Replacement string"}
+      },
+      "required": ["path", "old_string", "new_string"]
+    }
+  }
+}

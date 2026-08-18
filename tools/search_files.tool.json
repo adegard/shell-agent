@@ -1,0 +1,16 @@
+{
+  "type": "function",
+  "function": {
+    "name": "search_files",
+    "description": "Search file contents using regex pattern (grep)",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "pattern": {"type": "string", "description": "Regex pattern to search for"},
+        "path": {"type": "string", "description": "Directory to search in (default: current)"},
+        "include": {"type": "string", "description": "File pattern to include, e.g. *.js"}
+      },
+      "required": ["pattern"]
+    }
+  }
+}

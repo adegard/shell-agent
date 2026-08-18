@@ -1,0 +1,15 @@
+{
+  "type": "function",
+  "function": {
+    "name": "bash_exec",
+    "description": "Execute a shell command and return output",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "command": {"type": "string", "description": "Shell command to execute"},
+        "workdir": {"type": "string", "description": "Working directory (default: cwd)"}
+      },
+      "required": ["command"]
+    }
+  }
+}
