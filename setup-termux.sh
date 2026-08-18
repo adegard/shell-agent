@@ -171,12 +171,20 @@ ok "Model ready: ${MODEL}"
 INSTALL_DIR="${HOME}/shell-agent"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-info "Installing shell-agent to ${INSTALL_DIR}..."
-mkdir -p "${INSTALL_DIR}"
-cp -r "${SCRIPT_DIR}/lib" "${INSTALL_DIR}/"
-cp -r "${SCRIPT_DIR}/tools" "${INSTALL_DIR}/"
-cp "${SCRIPT_DIR}/agent.sh" "${INSTALL_DIR}/"
-chmod +x "${INSTALL_DIR}/agent.sh"
+# Resolve to absolute paths to check if same
+INSTALL_DIR_REAL="$(cd "${INSTALL_DIR}" 2>/dev/null && pwd || echo "${INSTALL_DIR}")"
+SCRIPT_DIR_REAL="$(cd "${SCRIPT_DIR}" 2>/dev/null && pwd || echo "${SCRIPT_DIR}")"
+
+if [[ "${INSTALL_DIR_REAL}" == "${SCRIPT_DIR_REAL}" ]]; then
+    ok "shell-agent already in place at ${INSTALL_DIR}"
+else
+    info "Installing shell-agent to ${INSTALL_DIR}..."
+    mkdir -p "${INSTALL_DIR}"
+    cp -r "${SCRIPT_DIR}/lib" "${INSTALL_DIR}/"
+    cp -r "${SCRIPT_DIR}/tools" "${INSTALL_DIR}/"
+    cp "${SCRIPT_DIR}/agent.sh" "${INSTALL_DIR}/"
+    chmod +x "${INSTALL_DIR}/agent.sh"
+fi
 
 # ── 6. Create convenience aliases ───────────────────────────────────────────
 ALIAS_FILE="${HOME}/.bashrc"
