@@ -22,10 +22,12 @@ done
 
 # ── Parse args ──────────────────────────────────────────────────────────────
 SINGLE_PROMPT=""
+FRESH_SESSION=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -m|--model) OLLAMA_MODEL="$2"; shift 2 ;;
         -d|--debug) export DEBUG=1; shift ;;
+        --fresh) FRESH_SESSION=1; shift ;;
         -t|--test)
             echo "Testing Ollama at ${OLLAMA_HOST}..."
             if ! curl -sf "${OLLAMA_HOST}/api/tags" >/dev/null 2>&1; then
@@ -44,10 +46,11 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         -h|--help)
-            echo "Usage: agent.sh [-m model] [-d] [-t] [prompt]"
+            echo "Usage: agent.sh [-m model] [-d] [-t] [--fresh] [prompt]"
             echo "  -m, --model   Override Ollama model"
             echo "  -d, --debug   Show debug output"
             echo "  -t, --test    Test Ollama connection"
+            echo "  --fresh       Start fresh session (ignore saved)"
             echo "  -h, --help    Show this help"
             echo ""
             echo "Env vars:"
@@ -178,8 +181,11 @@ run_agent() {
     add_message "user" "$user_input"
 
     local iteration=0
-    local last_tool=""
-    local repeat_count=0
+    # Track recent tool calls for loop detection (last N calls)
+    local -a recent_calls=()
+    local MAX_RECENT=5
+    local MAX_REPEAT=2
+
     while (( iteration < MAX_ITERATIONS )); do
         iteration=$((iteration + 1))
         echo -ne "${C_DIM}[${iteration}/${MAX_ITERATIONS}] thinking...${C_RESET}\r" >&2
@@ -214,28 +220,60 @@ run_agent() {
             tname=$(tool_name "$call_json")
             targs=$(tool_args "$call_json")
 
-            # ── Loop detection: same tool called 3+ times → break ──
             local call_sig="${tname}:${targs}"
-            if [[ "$call_sig" == "$last_tool" ]]; then
-                repeat_count=$((repeat_count + 1))
-                if (( repeat_count >= 2 )); then
-                    echo -e "${C_YELLOW}(model stuck in loop, forcing summary)${C_RESET}"
-                    add_message "assistant" "$content"
-                    add_message "user" "You already called this tool and got the result. Now respond with a text summary of what you found. Do NOT call any more tools."
-                    # Get final text response
-                    local final_resp
-                    final_resp=$(ollama_chat 2>&1)
-                    local final_content
-                    final_content=$(extract_content "$final_resp")
-                    echo ""
-                    echo -e "${C_GREEN}${final_content}${C_RESET}"
-                    echo ""
-                    return 0
+
+            # ── Loop detection: count how many times this exact call appears in recent history ──
+            local same_count=0
+            local recent_idx=$(( ${#recent_calls[@]} - MAX_RECENT ))
+            (( recent_idx < 0 )) && recent_idx=0
+            for (( ri=recent_idx; ri < ${#recent_calls[@]}; ri++ )); do
+                if [[ "${recent_calls[$ri]}" == "$call_sig" ]]; then
+                    same_count=$((same_count + 1))
                 fi
-            else
-                last_tool="$call_sig"
-                repeat_count=0
+            done
+
+            if (( same_count >= MAX_REPEAT )); then
+                echo -e "${C_YELLOW}(model stuck in loop — same tool+args called $((same_count+1))x, forcing summary)${C_RESET}"
+                add_message "assistant" "$content"
+                add_message "user" "STOP. You have already called this tool with the same arguments and got the result. Do NOT call any more tools. Respond now with a text summary of what you found and what you did."
+                local final_resp
+                final_resp=$(ollama_chat 2>&1)
+                local final_content
+                final_content=$(extract_content "$final_resp")
+                echo ""
+                echo -e "${C_GREEN}${final_content}${C_RESET}"
+                echo ""
+                save_session
+                return 0
             fi
+
+            # Also detect: same tool name called MAX_REPEAT+ times even with different args
+            local tool_count=0
+            for (( ri=recent_idx; ri < ${#recent_calls[@]}; ri++ )); do
+                local prev_name="${recent_calls[$ri]%%:*}"
+                if [[ "$prev_name" == "$tname" ]]; then
+                    tool_count=$((tool_count + 1))
+                fi
+            done
+
+            if (( tool_count >= MAX_REPEAT )); then
+                echo -e "${C_YELLOW}(model calling ${tname} repeatedly, forcing summary)${C_RESET}"
+                add_message "assistant" "$content"
+                add_message "user" "STOP. You have called ${tname} too many times. Do NOT call any more tools. Respond now with a text summary of what you found and what you did."
+                local final_resp
+                final_resp=$(ollama_chat 2>&1)
+                local final_content
+                final_content=$(extract_content "$final_resp")
+                echo ""
+                echo -e "${C_GREEN}${final_content}${C_RESET}"
+                echo ""
+                save_session
+                return 0
+            fi
+
+            # Track this call
+            recent_calls+=("$call_sig")
+            (( ${#recent_calls[@]} > MAX_RECENT * 2 )) && recent_calls=("${recent_calls[@]:$MAX_RECENT}")
 
             # Show tool call
             echo -e "${C_BLUE}▸ tool:${C_RESET} ${C_BOLD}${tname}${C_RESET} ${C_DIM}$(echo "$targs" | jq -c '.' 2>/dev/null || echo "$targs")${C_RESET}"
@@ -293,10 +331,8 @@ ${output}"
             echo -e "${C_GREEN}${content}${C_RESET}"
             echo ""
 
-            # Save session for persistence
             save_session
 
-            # Log the exchange
             printf '{"ts":"%s","input":"%s","iterations":%d}\n' \
                 "$(date -Iseconds)" "$user_input" "$iteration" \
                 >> "${HISTORY_FILE}"
@@ -316,11 +352,11 @@ if [[ -n "$SINGLE_PROMPT" ]]; then
     run_agent "$SINGLE_PROMPT"
 else
     echo -e "${C_BOLD}shell-agent${C_RESET} - local coding assistant"
-    echo -e "${C_DIM}Commands: /clear /history /restart | quit to exit${C_RESET}"
+    echo -e "${C_DIM}Commands: /clear (new session), /history (show context), quit to exit${C_RESET}"
     echo ""
 
-    # Try to resume previous session
-    if load_session 2>/dev/null; then
+    # Try to resume previous session (unless --fresh)
+    if [[ "$FRESH_SESSION" -eq 0 ]] && load_session 2>/dev/null; then
         echo -e "${C_DIM}(resumed previous session with ${#OLLAMA_MESSAGES[@]} messages)${C_RESET}"
         echo ""
     fi
@@ -332,7 +368,7 @@ else
         [[ "$input" == "quit" || "$input" == "exit" || "$input" == "q" ]] && break
 
         # Handle built-in commands
-        if [[ "$input" == "/clear" ]]; then
+        if [[ "$input" == "/clear" || "$input" == "/fresh" ]]; then
             clear_session
             echo -e "${C_DIM}(session cleared)${C_RESET}"
             continue

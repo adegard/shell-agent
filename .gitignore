@@ -1,2 +1,4 @@
 *.tar.gz
 *.log
+*.tmp
+node_modules/

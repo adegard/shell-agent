@@ -6,7 +6,7 @@ tool_write_file() {
     local content="$2"
 
     mkdir -p "$(dirname "$path")"
-    printf '%s\n' "$content" > "$path"
+    printf '%s' "$content" > "$path"
 
     local lines
     lines=$(wc -l < "$path")

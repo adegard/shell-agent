@@ -84,13 +84,14 @@ The agent remembers your conversation across turns:
 
 | Command | What it does |
 |---|---|
-| `/clear` | Start a fresh session |
+| `/clear` or `/fresh` | Start a fresh session |
 | `/history` | Show current context messages |
 | `/restart` | Restart Ollama server |
 | `quit` / `exit` | Exit the agent |
 
 - Sessions auto-save to `~/.shell-agent/session.json`
 - Previous session resumes automatically on startup
+- Use `--fresh` flag or `/fresh` command to skip old sessions
 - Context auto-compacts when it gets too long (keeps system + last 6 messages)
 
 ## Interactive commands
@@ -98,6 +99,7 @@ The agent remembers your conversation across turns:
 ```
 agent                           # Start interactive session
 agent "do something"            # Single prompt, then exit
+agent --fresh                   # Start fresh (ignore saved session)
 agent -m qwen2.5-coder:0.5b    # Use a different model
 agent --test                    # Test Ollama connection
 agent --debug                   # Show debug output

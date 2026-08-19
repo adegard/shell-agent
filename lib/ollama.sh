@@ -38,14 +38,17 @@ Available tools:
 - list_dir: {path} — list directory
 - web_fetch: {url, format?} — fetch a webpage (text or html)
 
-IMPORTANT RULES:
-1. Call ONE tool at a time
+CRITICAL RULES:
+1. Call ONE tool at a time, then WAIT for the result
 2. After each tool result, DECIDE: call another tool OR respond with text
 3. When you have enough information, STOP calling tools and respond with text
-4. NEVER call the same tool with the same arguments twice
-5. For "list files" tasks: list the directory ONCE, then describe what you see in text
-6. To get GitHub repos, use: bash_exec with command "curl -s https://api.github.com/users/USERNAME/repos | jq '.[].full_name'"
-7. After completing a task, respond with what you did. Wait for the next request.
+4. NEVER call the same tool with the same arguments more than once
+5. NEVER call the same tool with different arguments more than 2 times in a row
+6. After writing a file, DO NOT write it again — move on
+7. After listing a directory, describe what you see in text — do NOT list it again
+8. When you complete a task, say what you did and STOP. Wait for the next request.
+9. Do NOT create files unless explicitly asked. If asked to edit, read first.
+10. If a tool call succeeds, move on. Do NOT retry successful operations.
 SYSPROMPT
 }
 
@@ -180,9 +183,20 @@ parse_tool_call() {
             tool_json=$(echo "$content" | sed -n "/^\`\`\`${tname}/,/^\`\`\`/{/\`\`\`/d;p}" | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
             if [[ -n "$tool_json" ]]; then
                 # Model output just the args without {"name":..., "args":...} wrapper
-                # Wrap it: {"name": "tname", "args": <json>}
                 if [[ "$tool_json" != *'"name"'* ]]; then
-                    tool_json="{\"name\":\"${tname}\",\"args\":${tool_json}}"
+                    # Validate it's valid JSON before wrapping
+                    if echo "$tool_json" | jq -e '.' &>/dev/null; then
+                        tool_json="{\"name\":\"${tname}\",\"args\":${tool_json}}"
+                    else
+                        # Try to fix common JSON issues: single quotes, trailing commas
+                        local fixed
+                        fixed=$(echo "$tool_json" | sed "s/'/\"/g" | sed 's/,\s*}/}/g' | sed 's/,\s*]/]/g')
+                        if echo "$fixed" | jq -e '.' &>/dev/null; then
+                            tool_json="{\"name\":\"${tname}\",\"args\":${fixed}}"
+                        else
+                            tool_json=""
+                        fi
+                    fi
                 fi
                 break
             fi
@@ -263,18 +277,19 @@ compact_if_needed() {
     if (( total_chars > max_chars )); then
         echo -e "${C_DIM}(context full, compacting...)${C_RESET}"
 
-        # Keep: system message [0] + last 6 messages
-        local sys_msg="${OLLAMA_MESSAGES[0]}"
         local total=${#OLLAMA_MESSAGES[@]}
         local keep_start=$((total - 6))
         (( keep_start < 2 )) && keep_start=2
 
-        OLLAMA_MESSAGES=("$sys_msg")
+        # Copy messages to keep into a new array (avoid corrupting while reading)
+        local -a new_msgs=("${OLLAMA_MESSAGES[0]}")
         local i=$keep_start
         while (( i < total )); do
-            OLLAMA_MESSAGES+=("${OLLAMA_MESSAGES[$i]}")
+            new_msgs+=("${OLLAMA_MESSAGES[i]}")
             i=$((i + 1))
         done
+
+        OLLAMA_MESSAGES=("${new_msgs[@]}")
 
         save_session
         echo -e "${C_DIM}(compacted: kept system + last $((total - keep_start)) messages)${C_RESET}"
