@@ -140,6 +140,13 @@ execute_tool() {
             [[ -z "$p" ]] && p="$WORKSPACE"
             result=$(tool_list_dir "$p")
             ;;
+        web_fetch)
+            local url fmt
+            url=$(tool_arg "$args_json" "url")
+            fmt=$(tool_arg "$args_json" "format")
+            [[ -z "$fmt" ]] && fmt="text"
+            result=$(tool_web_fetch "$url" "$fmt")
+            ;;
         *)
             result="ERROR: Unknown tool: ${name}"
             ;;
@@ -278,10 +285,16 @@ run_agent() {
             add_message "user" "Tool result for ${tname}:
 ${output}"
 
+            # Auto-compact: if messages get too large, summarize old ones
+            compact_if_needed
+
         else
             echo ""
             echo -e "${C_GREEN}${content}${C_RESET}"
             echo ""
+
+            # Save session for persistence
+            save_session
 
             # Log the exchange
             printf '{"ts":"%s","input":"%s","iterations":%d}\n' \
@@ -293,6 +306,7 @@ ${output}"
     done
 
     echo -e "${C_YELLOW}Reached max iterations (${MAX_ITERATIONS})${C_RESET}"
+    save_session
 }
 
 # ── Entry point ─────────────────────────────────────────────────────────────
@@ -302,14 +316,39 @@ if [[ -n "$SINGLE_PROMPT" ]]; then
     run_agent "$SINGLE_PROMPT"
 else
     echo -e "${C_BOLD}shell-agent${C_RESET} - local coding assistant"
-    echo -e "${C_DIM}Type your request, or 'quit' to exit${C_RESET}"
+    echo -e "${C_DIM}Commands: /clear (new session), /history (show context), quit to exit${C_RESET}"
     echo ""
+
+    # Try to resume previous session
+    if load_session 2>/dev/null; then
+        echo -e "${C_DIM}(resumed previous session with ${#OLLAMA_MESSAGES[@]} messages)${C_RESET}"
+        echo ""
+    fi
 
     while true; do
         echo -ne "${C_GREEN}▸ ${C_RESET}"
         read -r input || break
         [[ -z "$input" ]] && continue
         [[ "$input" == "quit" || "$input" == "exit" || "$input" == "q" ]] && break
+
+        # Handle built-in commands
+        if [[ "$input" == "/clear" ]]; then
+            clear_session
+            echo -e "${C_DIM}(session cleared)${C_RESET}"
+            continue
+        fi
+        if [[ "$input" == "/history" ]]; then
+            echo -e "${C_DIM}Session messages: ${#OLLAMA_MESSAGES[@]}${C_RESET}"
+            local_count=0
+            for m in "${OLLAMA_MESSAGES[@]}"; do
+                local role
+                role=$(echo "$m" | jq -r '.role' 2>/dev/null)
+                local preview
+                preview=$(echo "$m" | jq -r '.content // ""' 2>/dev/null | head -c 60)
+                echo -e "${C_DIM}  [$((++local_count))] ${role}: ${preview}...${C_RESET}"
+            done
+            continue
+        fi
 
         run_agent "$input"
         echo ""

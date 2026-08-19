@@ -36,6 +36,7 @@ Available tools:
 - glob_files: {pattern, path?} — find files by name
 - bash_exec: {command, workdir?} — run a shell command
 - list_dir: {path} — list directory
+- web_fetch: {url, format?} — fetch a webpage (text or html)
 
 IMPORTANT RULES:
 1. Call ONE tool at a time
@@ -43,6 +44,8 @@ IMPORTANT RULES:
 3. When you have enough information, STOP calling tools and respond with text
 4. NEVER call the same tool with the same arguments twice
 5. For "list files" tasks: list the directory ONCE, then describe what you see in text
+6. To get GitHub repos, use: bash_exec with command "curl -s https://api.github.com/users/USERNAME/repos | jq '.[].full_name'"
+7. After completing a task, respond with what you did. Wait for the next request.
 SYSPROMPT
 }
 
@@ -165,4 +168,79 @@ tool_args() {
 # Extract a single arg value
 tool_arg() {
     echo "$1" | jq -r ".$2 // \"\"" 2>/dev/null
+}
+
+# ── Session persistence ─────────────────────────────────────────────────────
+
+SESSION_FILE="${AGENT_DIR}/session.json"
+
+save_session() {
+    local msgs_json="["
+    local first=true
+    for m in "${OLLAMA_MESSAGES[@]}"; do
+        [[ "$first" == "true" ]] && first=false || msgs_json+=","
+        msgs_json+="$m"
+    done
+    msgs_json+="]"
+    echo "$msgs_json" > "${SESSION_FILE}"
+}
+
+load_session() {
+    if [[ -f "${SESSION_FILE}" ]] && [[ -s "${SESSION_FILE}" ]]; then
+        local count
+        count=$(jq 'length' "${SESSION_FILE}" 2>/dev/null || echo "0")
+        if (( count > 0 )); then
+            OLLAMA_MESSAGES=()
+            local i=0
+            while (( i < count )); do
+                local msg
+                msg=$(jq -c ".[$i]" "${SESSION_FILE}" 2>/dev/null)
+                [[ -n "$msg" ]] && OLLAMA_MESSAGES+=("$msg")
+                i=$((i + 1))
+            done
+            return 0
+        fi
+    fi
+    return 1
+}
+
+clear_session() {
+    OLLAMA_MESSAGES=()
+    rm -f "${SESSION_FILE}"
+}
+
+# ── Auto-compaction ─────────────────────────────────────────────────────────
+
+compact_if_needed() {
+    local total_chars=0
+    for m in "${OLLAMA_MESSAGES[@]}"; do
+        total_chars=$((total_chars + ${#m}))
+    done
+
+    local max_chars=$((CONTEXT_WINDOW * 4 * 80 / 100))
+
+    if (( total_chars > max_chars )); then
+        echo -e "${C_DIM}(context full, compacting...)${C_RESET}"
+
+        # Keep: system message [0] + last 6 messages
+        local sys_msg="${OLLAMA_MESSAGES[0]}"
+        local total=${#OLLAMA_MESSAGES[@]}
+        local keep_start=$((total - 6))
+        (( keep_start < 2 )) && keep_start=2
+
+        OLLAMA_MESSAGES=("$sys_msg")
+        local i=$keep_start
+        while (( i < total )); do
+            OLLAMA_MESSAGES+=("${OLLAMA_MESSAGES[$i]}")
+            i=$((i + 1))
+        done
+
+        save_session
+        echo -e "${C_DIM}(compacted: kept system + last $((total - keep_start)) messages)${C_RESET}"
+    fi
+}
+
+# ── Session save after each turn ────────────────────────────────────────────
+save_session_after_turn() {
+    save_session
 }
