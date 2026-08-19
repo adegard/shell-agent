@@ -8,6 +8,7 @@ AGENT_VERSION="0.1.0"
 OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5-coder:1.5b}"
 OLLAMA_TIMEOUT="${OLLAMA_TIMEOUT:-120}"
+OLLAMA_BIN="${OLLAMA_BIN:-$(command -v ollama 2>/dev/null || echo "${HOME}/.local/bin/ollama")}"
 
 # Paths
 AGENT_DIR="${HOME}/.shell-agent"

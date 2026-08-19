@@ -150,6 +150,11 @@ execute_tool() {
             [[ -z "$fmt" ]] && fmt="text"
             result=$(tool_web_fetch "$url" "$fmt")
             ;;
+        todowrite)
+            local todos
+            todos=$(tool_arg "$args_json" "todos")
+            result=$(tool_todowrite "$todos")
+            ;;
         *)
             result="ERROR: Unknown tool: ${name}"
             ;;
@@ -168,16 +173,26 @@ execute_tool() {
 }
 
 # ── Main agent loop ─────────────────────────────────────────────────────────
+AGENT_MODE="build"  # "build" or "plan"
+LAST_USER_INPUT=""
+LAST_SESSION_FILE="${AGENT_DIR}/last_session.json"
+
 run_agent() {
     local user_input="$1"
+    LAST_USER_INPUT="$user_input"
 
-    echo -e "${C_BOLD}${C_CYAN}shell-agent${C_RESET} ${C_DIM}v${AGENT_VERSION}${C_RESET}"
+    local mode_label=""
+    if [[ "$AGENT_MODE" == "plan" ]]; then
+        mode_label="${C_YELLOW}[plan]${C_RESET} "
+    fi
+
+    echo -e "${mode_label}${C_BOLD}${C_CYAN}shell-agent${C_RESET} ${C_DIM}v${AGENT_VERSION}${C_RESET}"
     echo -e "${C_DIM}model: ${OLLAMA_MODEL} | workspace: ${WORKSPACE}${C_RESET}"
     echo ""
 
     build_tools_json
     OLLAMA_MESSAGES=()
-    add_message "system" "$(get_system_prompt)"
+    add_message "system" "$(get_system_prompt "$AGENT_MODE")"
     add_message "user" "$user_input"
 
     local iteration=0
@@ -219,6 +234,18 @@ run_agent() {
             local tname targs
             tname=$(tool_name "$call_json")
             targs=$(tool_args "$call_json")
+
+            # ── Plan mode: deny write/edit/bash tools ──
+            if [[ "$AGENT_MODE" == "plan" ]]; then
+                case "$tname" in
+                    write_file|edit_file|bash_exec|todowrite)
+                        echo -e "${C_YELLOW}[plan mode] Skipping ${tname} (read-only mode)${C_RESET}"
+                        add_message "assistant" "$content"
+                        add_message "user" "Tool ${tname} was skipped because you are in plan mode (read-only). You cannot make changes. Analyze the code and provide your plan in text."
+                        continue
+                        ;;
+                esac
+            fi
 
             local call_sig="${tname}:${targs}"
 
@@ -352,7 +379,7 @@ if [[ -n "$SINGLE_PROMPT" ]]; then
     run_agent "$SINGLE_PROMPT"
 else
     echo -e "${C_BOLD}shell-agent${C_RESET} - local coding assistant"
-    echo -e "${C_DIM}Commands: /clear (new session), /history (show context), quit to exit${C_RESET}"
+    echo -e "${C_DIM}Commands: /clear (new session), /plan (toggle plan mode), /undo (revert), /history (show context), quit to exit${C_RESET}"
     echo ""
 
     # Try to resume previous session (unless --fresh)
@@ -371,6 +398,26 @@ else
         if [[ "$input" == "/clear" || "$input" == "/fresh" ]]; then
             clear_session
             echo -e "${C_DIM}(session cleared)${C_RESET}"
+            continue
+        fi
+        if [[ "$input" == "/plan" ]]; then
+            if [[ "$AGENT_MODE" == "plan" ]]; then
+                AGENT_MODE="build"
+                echo -e "${C_DIM}(switched to build mode — full tool access)${C_RESET}"
+            else
+                AGENT_MODE="plan"
+                echo -e "${C_YELLOW}(switched to plan mode — read-only, no edits)${C_RESET}"
+            fi
+            continue
+        fi
+        if [[ "$input" == "/undo" ]]; then
+            if [[ -f "${LAST_SESSION_FILE}" ]]; then
+                cp "${LAST_SESSION_FILE}" "${SESSION_FILE}"
+                load_session 2>/dev/null
+                echo -e "${C_DIM}(restored previous session state)${C_RESET}"
+            else
+                echo -e "${C_DIM}(nothing to undo)${C_RESET}"
+            fi
             continue
         fi
         if [[ "$input" == "/history" ]]; then
@@ -400,6 +447,11 @@ else
                 echo -e "${C_RED}Failed to restart Ollama${C_RESET}"
             fi
             continue
+        fi
+
+        # Backup session before running (for /undo)
+        if [[ -f "${SESSION_FILE}" ]]; then
+            cp "${SESSION_FILE}" "${LAST_SESSION_FILE}" 2>/dev/null || true
         fi
 
         run_agent "$input"

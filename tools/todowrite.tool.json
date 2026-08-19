@@ -1,0 +1,26 @@
+{
+  "type": "function",
+  "function": {
+    "name": "todowrite",
+    "description": "Create and maintain a structured task list for the current coding session. Tracks progress, organizes multi-step work, and surfaces status.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "todos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "content": {"type": "string", "description": "Brief description of the task"},
+              "status": {"type": "string", "enum": ["pending", "in_progress", "completed"], "description": "Current status"},
+              "priority": {"type": "string", "enum": ["high", "medium", "low"], "description": "Priority level"}
+            },
+            "required": ["content", "status"]
+          },
+          "description": "Array of todo items to set"
+        }
+      },
+      "required": ["todos"]
+    }
+  }
+}

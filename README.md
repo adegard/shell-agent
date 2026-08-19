@@ -2,6 +2,8 @@
 
 Local coding assistant for **Termux on Android**. Opencode-style workflow powered by Ollama — reads, writes, searches, builds, and tests code entirely on your phone. No cloud APIs, no internet needed after setup.
 
+Inspired by [opencode](https://opencode.ai) — brings the same agent loop to your terminal.
+
 ## One-line install (Termux)
 
 Paste this into Termux:
@@ -22,6 +24,9 @@ agent "write a fizzbuzz in python"
 
 # Interactive mode:
 agent
+
+# Fresh session (skip old context):
+agent --fresh
 ```
 
 ## Choose your model
@@ -56,27 +61,18 @@ Same core loop as opencode — LLM thinks, calls tools, gets results, repeats:
 | Run commands | `bash_exec` | Build, test, git, curl, etc. |
 | List directories | `list_dir` | Browse project structure |
 | Fetch web pages | `web_fetch` | curl URLs for docs/APIs |
+| Track tasks | `todowrite` | Todo list for complex tasks |
 
-Example session:
+## Agents (like opencode)
 
-```
-agent "create a rust hello world, build and test it"
+Switch between **build** and **plan** mode during a session:
 
-▸ tool: glob_files {"pattern":"*.rs"}
-  Found 0 files
-▸ tool: write_file {"path":"src/main.rs","content":"fn main() { println!(\"hello\"); }"}
-  Wrote 1 lines to src/main.rs
-▸ tool: bash_exec {"command":"cargo build"}
-  $ cargo build
-  ...
-  exit: 0
-▸ tool: bash_exec {"command":"cargo test"}
-  $ cargo test
-  ...
-  exit: 0
+| Mode | What it does |
+|---|---|
+| **Build** (default) | Full access — read, write, edit, run commands |
+| **Plan** | Read-only — analyzes code, suggests changes, no modifications |
 
-All tests passing. Created src/main.rs with a hello world program.
-```
+Toggle with `/plan` command. In plan mode, write/edit/bash tools are blocked.
 
 ## Session management
 
@@ -85,6 +81,8 @@ The agent remembers your conversation across turns:
 | Command | What it does |
 |---|---|
 | `/clear` or `/fresh` | Start a fresh session |
+| `/plan` | Toggle between build and plan mode |
+| `/undo` | Restore previous session state |
 | `/history` | Show current context messages |
 | `/restart` | Restart Ollama server |
 | `quit` / `exit` | Exit the agent |
@@ -139,7 +137,8 @@ agent.sh                 Main loop — reads input, calls Ollama, dispatches too
     ├── glob_files.sh
     ├── bash_exec.sh
     ├── list_dir.sh
-    └── web_fetch.sh
+    ├── web_fetch.sh
+    └── todowrite.sh
 ```
 
 ## Requirements
