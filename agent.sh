@@ -173,7 +173,7 @@ execute_tool() {
             result=$(tool_todowrite "$todos")
             ;;
         *)
-            result="ERROR: Unknown tool: ${name}"
+            result="ERROR: Unknown tool: ${name}. Available tools: read_file, write_file, edit_file, search_files, glob_files, bash_exec, list_dir, web_fetch, todowrite"
             ;;
     esac
 
