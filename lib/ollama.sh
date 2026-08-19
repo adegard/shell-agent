@@ -135,7 +135,16 @@ has_tool_call() {
     local response="$1"
     local content
     content=$(extract_content "$response")
-    [[ "$content" == *'```tool'* ]]
+    # Match ```tool OR ```<tool_name> (model sometimes uses tool name as language)
+    [[ "$content" == *'```tool'* ]] || \
+    [[ "$content" == *'```bash_exec'* ]] || \
+    [[ "$content" == *'```write_file'* ]] || \
+    [[ "$content" == *'```read_file'* ]] || \
+    [[ "$content" == *'```edit_file'* ]] || \
+    [[ "$content" == *'```search_files'* ]] || \
+    [[ "$content" == *'```glob_files'* ]] || \
+    [[ "$content" == *'```list_dir'* ]] || \
+    [[ "$content" == *'```web_fetch'* ]]
 }
 
 # Parse tool call from response: {"name": "...", "args": {...}}
@@ -144,9 +153,25 @@ parse_tool_call() {
     local content
     content=$(extract_content "$response")
 
-    # Extract the JSON block between ```tool and ```
-    local tool_json
+    local tool_json=""
+
+    # Try ```tool first (correct format)
     tool_json=$(echo "$content" | sed -n '/```tool/,/```/{/```/d;p}' | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+
+    # If not found, try ```<tool_name> format
+    if [[ -z "$tool_json" ]]; then
+        for tname in bash_exec write_file read_file edit_file search_files glob_files list_dir web_fetch; do
+            tool_json=$(echo "$content" | sed -n "/^\`\`\`${tname}/,/^\`\`\`/{/\`\`\`/d;p}" | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+            if [[ -n "$tool_json" ]]; then
+                # Model output just the args without {"name":..., "args":...} wrapper
+                # Wrap it: {"name": "tname", "args": <json>}
+                if [[ "$tool_json" != *'"name"'* ]]; then
+                    tool_json="{\"name\":\"${tname}\",\"args\":${tool_json}}"
+                fi
+                break
+            fi
+        done
+    fi
 
     if [[ -n "$tool_json" ]]; then
         echo "$tool_json"
