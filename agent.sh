@@ -236,14 +236,41 @@ run_agent() {
             local output
             output=$(execute_tool "$tname" "$targs") || true
 
-            # Show output with line count
-            local line_count
-            line_count=$(echo "$output" | wc -l)
-            if (( line_count <= 15 )); then
-                echo -e "${C_DIM}${output}${C_RESET}"
+            # Show output — special formatting for bash_exec
+            if [[ "$tname" == "bash_exec" ]]; then
+                local cmd_line dir_line exit_line
+                cmd_line=$(echo "$output" | grep '^CMD: ' | sed 's/^CMD: //')
+                dir_line=$(echo "$output" | grep '^DIR: ' | sed 's/^DIR: //')
+                exit_line=$(echo "$output" | grep '^EXIT: ' | sed 's/^EXIT: //')
+                local out_body
+                out_body=$(echo "$output" | sed '/^CMD: /d; /^DIR: /d; /^OUT:/d; /^EXIT: /d')
+
+                echo -e "  ${C_CYAN}\$${C_RESET} ${C_BOLD}${cmd_line}${C_RESET}"
+                echo -e "  ${C_DIM}in ${dir_line}${C_RESET}"
+                if [[ -n "$out_body" ]]; then
+                    local out_lines
+                    out_lines=$(echo "$out_body" | wc -l)
+                    if (( out_lines <= 20 )); then
+                        echo -e "  ${C_DIM}${out_body}${C_RESET}"
+                    else
+                        echo -e "  ${C_DIM}$(echo "$out_body" | head -n 15)${C_RESET}"
+                        echo -e "  ${C_DIM}  ... +$(( out_lines - 15 )) lines${C_RESET}"
+                    fi
+                fi
+                if [[ "$exit_line" != "0" ]]; then
+                    echo -e "  ${C_RED}exit: ${exit_line}${C_RESET}"
+                else
+                    echo -e "  ${C_DIM}exit: 0${C_RESET}"
+                fi
             else
-                echo -e "${C_DIM}$(echo "$output" | head -n 10)${C_RESET}"
-                echo -e "${C_DIM}  ... +$(( line_count - 10 )) lines (${C_RESET}${line_count}${C_DIM} total)${C_RESET}"
+                local line_count
+                line_count=$(echo "$output" | wc -l)
+                if (( line_count <= 15 )); then
+                    echo -e "${C_DIM}${output}${C_RESET}"
+                else
+                    echo -e "${C_DIM}$(echo "$output" | head -n 10)${C_RESET}"
+                    echo -e "${C_DIM}  ... +$(( line_count - 10 )) lines (${C_RESET}${line_count}${C_DIM} total)${C_RESET}"
+                fi
             fi
             echo ""
 

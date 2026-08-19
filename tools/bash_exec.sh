@@ -10,14 +10,13 @@ tool_bash_exec() {
         return 1
     fi
 
-    echo "\$ ${command}"
-    echo "---"
-
     local output
     output=$(cd "$workdir" && eval "$command" 2>&1) || true
     local exit_code=$?
 
+    echo "CMD: ${command}"
+    echo "DIR: ${workdir}"
+    echo "OUT:"
     echo "$output"
-    echo "---"
-    echo "exit: ${exit_code}"
+    echo "EXIT: ${exit_code}"
 }
