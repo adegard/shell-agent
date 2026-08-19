@@ -364,8 +364,10 @@ run_agent() {
             echo ""
 
             add_message "assistant" "$content"
-            add_message "user" "Tool result for ${tname}:
-${output}"
+            add_message "user" "Tool ${tname} result:
+${output}
+
+Now respond to the user with a text message. Do NOT call another tool unless you need more information."
 
             # Auto-compact: if messages get too large, summarize old ones
             compact_if_needed
