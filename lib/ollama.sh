@@ -90,10 +90,11 @@ ollama_chat() {
     if ! curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
         echo -e "${C_YELLOW}Ollama not running, restarting...${C_RESET}" >&2
         local bin="${OLLAMA_BIN:-$(command -v ollama 2>/dev/null || echo "${HOME}/.local/bin/ollama")}"
+        local logfile="${AGENT_DIR}/ollama.log"
         if [[ -x "$bin" ]]; then
-            "$bin" serve &>/dev/null &
+            nohup "$bin" serve &>"$logfile" &
         elif command -v ollama &>/dev/null; then
-            ollama serve &>/dev/null &
+            nohup ollama serve &>"$logfile" &
         else
             echo "ERROR: Cannot find Ollama binary" >&2
             return 1
@@ -128,7 +129,7 @@ EOF
     fi
 
     local response http_code
-    response=$(curl -s -w "\n%{http_code}" --max-time "${OLLAMA_TIMEOUT}" \
+    response=$(curl -s -w "\n%{http_code}" --connect-timeout 5 --max-time "${OLLAMA_TIMEOUT}" \
         "${OLLAMA_HOST}/api/chat" \
         -H "Content-Type: application/json" \
         -d "$payload" 2>&1)

@@ -67,10 +67,11 @@ done
 # ── Check Ollama is running ─────────────────────────────────────────────────
 start_ollama() {
     local bin="${OLLAMA_BIN:-$(command -v ollama 2>/dev/null || echo "${HOME}/.local/bin/ollama")}"
+    local logfile="${AGENT_DIR}/ollama.log"
     if [[ -x "$bin" ]]; then
-        "$bin" serve &>/dev/null &
+        nohup "$bin" serve &>"$logfile" &
     elif command -v ollama &>/dev/null; then
-        ollama serve &>/dev/null &
+        nohup ollama serve &>"$logfile" &
     else
         return 1
     fi
@@ -451,7 +452,15 @@ else
         if [[ "$input" == "/restart" ]]; then
             echo -e "${C_DIM}Restarting Ollama...${C_RESET}"
             pkill ollama 2>/dev/null; sleep 1
-            if start_ollama; then
+            local logfile="${AGENT_DIR}/ollama.log"
+            local bin="${OLLAMA_BIN:-$(command -v ollama 2>/dev/null || echo "${HOME}/.local/bin/ollama")}"
+            if [[ -x "$bin" ]]; then
+                nohup "$bin" serve &>"$logfile" &
+            elif command -v ollama &>/dev/null; then
+                nohup ollama serve &>"$logfile" &
+            fi
+            sleep 2
+            if curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
                 echo -e "${C_GREEN}Ollama restarted${C_RESET}"
             else
                 echo -e "${C_RED}Failed to restart Ollama${C_RESET}"
