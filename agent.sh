@@ -171,6 +171,8 @@ run_agent() {
     add_message "user" "$user_input"
 
     local iteration=0
+    local last_tool=""
+    local repeat_count=0
     while (( iteration < MAX_ITERATIONS )); do
         iteration=$((iteration + 1))
         echo -ne "${C_DIM}[${iteration}/${MAX_ITERATIONS}] thinking...${C_RESET}\r" >&2
@@ -183,7 +185,6 @@ run_agent() {
             return 1
         }
 
-        # Check for error prefix from curl
         if [[ "$response" == ERROR:* ]]; then
             echo ""
             echo -e "${C_RED}${response}${C_RESET}"
@@ -195,40 +196,62 @@ run_agent() {
 
         if [[ -z "$content" ]]; then
             echo ""
-            echo -e "${C_YELLOW}Empty response from model. Raw response:${C_RESET}"
-            echo "$response" | head -10
+            echo -e "${C_YELLOW}Empty response from model.${C_RESET}"
             return 1
         fi
 
         if has_tool_call "$response"; then
-            # Parse and execute tool
             local call_json
             call_json=$(parse_tool_call "$response")
             local tname targs
             tname=$(tool_name "$call_json")
             targs=$(tool_args "$call_json")
 
-            echo -e "${C_BLUE}▸ tool:${C_RESET} ${C_BOLD}${tname}${C_RESET}"
+            # ── Loop detection: same tool called 3+ times → break ──
+            local call_sig="${tname}:${targs}"
+            if [[ "$call_sig" == "$last_tool" ]]; then
+                repeat_count=$((repeat_count + 1))
+                if (( repeat_count >= 2 )); then
+                    echo -e "${C_YELLOW}(model stuck in loop, forcing summary)${C_RESET}"
+                    add_message "assistant" "$content"
+                    add_message "user" "You already called this tool and got the result. Now respond with a text summary of what you found. Do NOT call any more tools."
+                    # Get final text response
+                    local final_resp
+                    final_resp=$(ollama_chat 2>&1)
+                    local final_content
+                    final_content=$(extract_content "$final_resp")
+                    echo ""
+                    echo -e "${C_GREEN}${final_content}${C_RESET}"
+                    echo ""
+                    return 0
+                fi
+            else
+                last_tool="$call_sig"
+                repeat_count=0
+            fi
+
+            # Show tool call
+            echo -e "${C_BLUE}▸ tool:${C_RESET} ${C_BOLD}${tname}${C_RESET} ${C_DIM}$(echo "$targs" | jq -c '.' 2>/dev/null || echo "$targs")${C_RESET}"
 
             local output
             output=$(execute_tool "$tname" "$targs") || true
 
-            # Show brief output
-            local preview
-            preview=$(echo "$output" | head -n 8)
-            echo -e "${C_DIM}${preview}${C_RESET}"
-            if (( $(echo "$output" | wc -l) > 8 )); then
-                echo -e "${C_DIM}  ... ($(( $(echo "$output" | wc -l) - 8 )) more lines)${C_RESET}"
+            # Show output with line count
+            local line_count
+            line_count=$(echo "$output" | wc -l)
+            if (( line_count <= 15 )); then
+                echo -e "${C_DIM}${output}${C_RESET}"
+            else
+                echo -e "${C_DIM}$(echo "$output" | head -n 10)${C_RESET}"
+                echo -e "${C_DIM}  ... +$(( line_count - 10 )) lines (${C_RESET}${line_count}${C_DIM} total)${C_RESET}"
             fi
             echo ""
 
-            # Add assistant message and tool result to context
             add_message "assistant" "$content"
             add_message "user" "Tool result for ${tname}:
 ${output}"
 
         else
-            # No tool call — LLM is done
             echo ""
             echo -e "${C_GREEN}${content}${C_RESET}"
             echo ""
