@@ -316,7 +316,7 @@ if [[ -n "$SINGLE_PROMPT" ]]; then
     run_agent "$SINGLE_PROMPT"
 else
     echo -e "${C_BOLD}shell-agent${C_RESET} - local coding assistant"
-    echo -e "${C_DIM}Commands: /clear (new session), /history (show context), quit to exit${C_RESET}"
+    echo -e "${C_DIM}Commands: /clear /history /restart | quit to exit${C_RESET}"
     echo ""
 
     # Try to resume previous session
@@ -347,6 +347,22 @@ else
                 preview=$(echo "$m" | jq -r '.content // ""' 2>/dev/null | head -c 60)
                 echo -e "${C_DIM}  [$((++local_count))] ${role}: ${preview}...${C_RESET}"
             done
+            continue
+        fi
+        if [[ "$input" == "/restart" ]]; then
+            echo -e "${C_DIM}Restarting Ollama...${C_RESET}"
+            pkill ollama 2>/dev/null; sleep 1
+            if [[ -x "$OLLAMA_BIN" ]]; then
+                "${OLLAMA_BIN}" serve &>/dev/null &
+            else
+                ollama serve &>/dev/null &
+            fi
+            sleep 3
+            if curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
+                echo -e "${C_GREEN}Ollama restarted${C_RESET}"
+            else
+                echo -e "${C_RED}Failed to restart Ollama${C_RESET}"
+            fi
             continue
         fi
 

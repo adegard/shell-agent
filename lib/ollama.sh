@@ -68,6 +68,22 @@ json_escape() {
 
 # Send chat request to Ollama (native API, more reliable than OpenAI compat)
 ollama_chat() {
+    # Auto-restart Ollama if not responding
+    if ! curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
+        echo -e "${C_YELLOW}Ollama not running, restarting...${C_RESET}" >&2
+        if [[ -x "$OLLAMA_BIN" ]]; then
+            "${OLLAMA_BIN}" serve &>/dev/null &
+        else
+            ollama serve &>/dev/null &
+        fi
+        sleep 3
+        if ! curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
+            echo "ERROR: Cannot start Ollama" >&2
+            return 1
+        fi
+        echo -e "${C_GREEN}Ollama restarted${C_RESET}" >&2
+    fi
+
     local messages_json
     messages_json=$(printf '%s\n' "${OLLAMA_MESSAGES[@]}" | paste -sd, -)
 
