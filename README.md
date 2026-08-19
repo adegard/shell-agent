@@ -1,4 +1,4 @@
-# shell-agent - WORK IN PROGRESS -
+# shell-agent
 
 Local coding assistant for **Termux on Android**. Opencode-style workflow powered by Ollama — reads, writes, searches, builds, and tests code entirely on your phone. No cloud APIs, no internet needed after setup.
 
@@ -10,7 +10,6 @@ Paste this into Termux:
 pkg update -y && pkg install -y git && git clone https://github.com/adegard/shell-agent.git && bash shell-agent/setup-termux.sh
 ```
 
-[Wait and relax... it takes time] 
 That's it. It installs Ollama, pulls a coding model, and sets up the agent.
 
 ## After install
@@ -47,35 +46,61 @@ export OLLAMA_MODEL=qwen2.5-coder:3b
 
 Same core loop as opencode — LLM thinks, calls tools, gets results, repeats:
 
-| Feature | How |
-|---|---|
-| Read files | `read_file` tool |
-| Write/create files | `write_file` tool |
-| Edit files | `edit_file` tool (find & replace) |
-| Search code | `search_files` (grep across project) |
-| Find files | `glob_files` (pattern matching) |
-| Run commands | `bash_exec` (build, test, git, etc.) |
-| List directories | `list_dir` |
+| Feature | Tool | Description |
+|---|---|---|
+| Read files | `read_file` | Read any file |
+| Write/create files | `write_file` | Create or overwrite files |
+| Edit files | `edit_file` | Find & replace in files |
+| Search code | `search_files` | Grep across project |
+| Find files | `glob_files` | Pattern matching |
+| Run commands | `bash_exec` | Build, test, git, curl, etc. |
+| List directories | `list_dir` | Browse project structure |
+| Fetch web pages | `web_fetch` | curl URLs for docs/APIs |
 
 Example session:
 
 ```
 agent "create a rust hello world, build and test it"
 
-▸ tool: glob_files
+▸ tool: glob_files {"pattern":"*.rs"}
   Found 0 files
-▸ tool: write_file
-  Wrote 20 lines to src/main.rs
-▸ tool: bash_exec
+▸ tool: write_file {"path":"src/main.rs","content":"fn main() { println!(\"hello\"); }"}
+  Wrote 1 lines to src/main.rs
+▸ tool: bash_exec {"command":"cargo build"}
   $ cargo build
   ...
   exit: 0
-▸ tool: bash_exec
+▸ tool: bash_exec {"command":"cargo test"}
   $ cargo test
   ...
   exit: 0
 
 All tests passing. Created src/main.rs with a hello world program.
+```
+
+## Session management
+
+The agent remembers your conversation across turns:
+
+| Command | What it does |
+|---|---|
+| `/clear` | Start a fresh session |
+| `/history` | Show current context messages |
+| `/restart` | Restart Ollama server |
+| `quit` / `exit` | Exit the agent |
+
+- Sessions auto-save to `~/.shell-agent/session.json`
+- Previous session resumes automatically on startup
+- Context auto-compacts when it gets too long (keeps system + last 6 messages)
+
+## Interactive commands
+
+```
+agent                           # Start interactive session
+agent "do something"            # Single prompt, then exit
+agent -m qwen2.5-coder:0.5b    # Use a different model
+agent --test                    # Test Ollama connection
+agent --debug                   # Show debug output
 ```
 
 ## Configuration
@@ -87,6 +112,7 @@ Environment variables:
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama server URL |
 | `OLLAMA_MODEL` | `qwen2.5-coder:1.5b` | Model to use |
 | `WORKSPACE` | current dir | Working directory |
+| `DEBUG` | `0` | Set to `1` for verbose output |
 
 ## Useful commands
 
@@ -102,7 +128,7 @@ agent                   # Start interactive coding session
 ```
 agent.sh                 Main loop — reads input, calls Ollama, dispatches tools
 ├── lib/config.sh        Settings, colors, paths
-├── lib/ollama.sh        Ollama API, tool-call parsing, message history
+├── lib/ollama.sh        Ollama API, tool-call parsing, session persistence, compaction
 └── tools/               Each tool is a standalone bash function
     ├── read_file.sh
     ├── write_file.sh
@@ -110,7 +136,8 @@ agent.sh                 Main loop — reads input, calls Ollama, dispatches too
     ├── search_files.sh
     ├── glob_files.sh
     ├── bash_exec.sh
-    └── list_dir.sh
+    ├── list_dir.sh
+    └── web_fetch.sh
 ```
 
 ## Requirements
