@@ -220,7 +220,7 @@ run_agent() {
 
     while (( iteration < MAX_ITERATIONS )); do
         iteration=$((iteration + 1))
-        echo -ne "${C_DIM}[${iteration}/${MAX_ITERATIONS}] thinking...${C_RESET}\r" >&2
+        echo -ne "\r${C_DIM}[${iteration}/${MAX_ITERATIONS}] thinking...${C_RESET}  " >&2
 
         local response
         response=$(ollama_chat 2>&1) || {
