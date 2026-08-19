@@ -168,7 +168,7 @@ info "Pulling model: ${MODEL} (may take a while on first run)..."
 ok "Model ready: ${MODEL}"
 
 # ── 5. Install the agent ────────────────────────────────────────────────────
-INSTALL_DIR="${HOME}/agent-shell"
+INSTALL_DIR="${HOME}/shell-agent"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Resolve to absolute paths to check if same
