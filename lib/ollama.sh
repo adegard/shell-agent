@@ -146,7 +146,7 @@ has_tool_call() {
     local response="$1"
     local content
     content=$(extract_content "$response")
-    # Match ```tool OR ```<tool_name> (model sometimes uses tool name as language)
+    # Match any code block that looks like a tool call
     [[ "$content" == *'```tool'* ]] || \
     [[ "$content" == *'```bash_exec'* ]] || \
     [[ "$content" == *'```write_file'* ]] || \
@@ -155,7 +155,10 @@ has_tool_call() {
     [[ "$content" == *'```search_files'* ]] || \
     [[ "$content" == *'```glob_files'* ]] || \
     [[ "$content" == *'```list_dir'* ]] || \
-    [[ "$content" == *'```web_fetch'* ]]
+    [[ "$content" == *'```web_fetch'* ]] || \
+    [[ "$content" == *'```todowrite'* ]] || \
+    [[ "$content" == *'"name"'*'"args"'* ]] || \
+    [[ "$content" == *'"name":'* ]]
 }
 
 # Parse tool call from response: {"name": "...", "args": {...}}
@@ -171,16 +174,13 @@ parse_tool_call() {
 
     # If not found, try ```<tool_name> format
     if [[ -z "$tool_json" ]]; then
-        for tname in bash_exec write_file read_file edit_file search_files glob_files list_dir web_fetch; do
+        for tname in bash_exec write_file read_file edit_file search_files glob_files list_dir web_fetch todowrite; do
             tool_json=$(echo "$content" | sed -n "/^\`\`\`${tname}/,/^\`\`\`/{/\`\`\`/d;p}" | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
             if [[ -n "$tool_json" ]]; then
-                # Model output just the args without {"name":..., "args":...} wrapper
                 if [[ "$tool_json" != *'"name"'* ]]; then
-                    # Validate it's valid JSON before wrapping
                     if echo "$tool_json" | jq -e '.' &>/dev/null; then
                         tool_json="{\"name\":\"${tname}\",\"args\":${tool_json}}"
                     else
-                        # Try to fix common JSON issues: single quotes, trailing commas
                         local fixed
                         fixed=$(echo "$tool_json" | sed "s/'/\"/g" | sed 's/,\s*}/}/g' | sed 's/,\s*]/]/g')
                         if echo "$fixed" | jq -e '.' &>/dev/null; then
@@ -193,6 +193,23 @@ parse_tool_call() {
                 break
             fi
         done
+    fi
+
+    # Fallback: find first JSON object with "name" field anywhere in content
+    if [[ -z "$tool_json" ]]; then
+        tool_json=$(echo "$content" | grep -o '{[^{}]*"name"[^{}]*}' | head -1)
+        if [[ -n "$tool_json" ]] && echo "$tool_json" | jq -e '.' &>/dev/null; then
+            # Check if it has args, if not wrap it
+            if [[ "$tool_json" != *'"args"'* ]]; then
+                local tname
+                tname=$(echo "$tool_json" | jq -r '.name' 2>/dev/null)
+                local args
+                args=$(echo "$tool_json" | jq -c 'del(.name)' 2>/dev/null)
+                tool_json="{\"name\":\"${tname}\",\"args\":${args}}"
+            fi
+        else
+            tool_json=""
+        fi
     fi
 
     if [[ -n "$tool_json" ]]; then
