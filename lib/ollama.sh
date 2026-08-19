@@ -89,12 +89,16 @@ ollama_chat() {
     # Auto-restart Ollama if not responding
     if ! curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
         echo -e "${C_YELLOW}Ollama not running, restarting...${C_RESET}" >&2
-        if [[ -x "$OLLAMA_BIN" ]]; then
-            "${OLLAMA_BIN}" serve &>/dev/null &
-        else
+        local bin="${OLLAMA_BIN:-$(command -v ollama 2>/dev/null || echo "${HOME}/.local/bin/ollama")}"
+        if [[ -x "$bin" ]]; then
+            "$bin" serve &>/dev/null &
+        elif command -v ollama &>/dev/null; then
             ollama serve &>/dev/null &
+        else
+            echo "ERROR: Cannot find Ollama binary" >&2
+            return 1
         fi
-        sleep 3
+        sleep 2
         if ! curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
             echo "ERROR: Cannot start Ollama" >&2
             return 1

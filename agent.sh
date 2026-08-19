@@ -65,28 +65,44 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── Check Ollama is running ─────────────────────────────────────────────────
-check_ollama() {
-    if ! curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
-        echo -e "${C_RED}Ollama is not running at ${OLLAMA_HOST}${C_RESET}"
-        echo ""
-        echo "Start it with:"
-        echo "  ollama serve &"
-        echo ""
-        echo "Or install Ollama:"
-        echo "  curl -fsSL https://ollama.com/install.sh | sh"
-        exit 1
+start_ollama() {
+    local bin="${OLLAMA_BIN:-$(command -v ollama 2>/dev/null || echo "${HOME}/.local/bin/ollama")}"
+    if [[ -x "$bin" ]]; then
+        "$bin" serve &>/dev/null &
+    elif command -v ollama &>/dev/null; then
+        ollama serve &>/dev/null &
+    else
+        return 1
     fi
+    sleep 2
+    curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null
+}
 
-    # Check model exists
-    local models
-    models=$(curl -sf "${OLLAMA_HOST}/api/tags" | jq -r '.models[].name' 2>/dev/null)
-    if ! echo "$models" | grep -q "$OLLAMA_MODEL"; then
+check_ollama() {
+    if curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
+        # Already running, just check model
+        local models
+        models=$(curl -sf "${OLLAMA_HOST}/api/tags" | jq -r '.models[].name' 2>/dev/null)
+        if echo "$models" | grep -q "$OLLAMA_MODEL"; then
+            return 0
+        fi
         echo -e "${C_YELLOW}Model '${OLLAMA_MODEL}' not found.${C_RESET}"
         echo ""
         echo "Available models:"
         echo "$models" | sed 's/^/  /'
         echo ""
         echo "Pull it with: ollama pull ${OLLAMA_MODEL}"
+        exit 1
+    fi
+
+    # Not running — try to start it
+    echo -e "${C_DIM}Starting Ollama...${C_RESET}" >&2
+    if start_ollama; then
+        echo -e "${C_GREEN}Ollama started${C_RESET}" >&2
+    else
+        echo -e "${C_RED}Cannot start Ollama. Is it installed?${C_RESET}" >&2
+        echo "  Install: curl -fsSL https://ollama.com/install.sh | sh" >&2
+        echo "  Or start manually: ollama serve &" >&2
         exit 1
     fi
 }
@@ -435,13 +451,7 @@ else
         if [[ "$input" == "/restart" ]]; then
             echo -e "${C_DIM}Restarting Ollama...${C_RESET}"
             pkill ollama 2>/dev/null; sleep 1
-            if [[ -x "$OLLAMA_BIN" ]]; then
-                "${OLLAMA_BIN}" serve &>/dev/null &
-            else
-                ollama serve &>/dev/null &
-            fi
-            sleep 3
-            if curl -sf "${OLLAMA_HOST}/api/tags" &>/dev/null; then
+            if start_ollama; then
                 echo -e "${C_GREEN}Ollama restarted${C_RESET}"
             else
                 echo -e "${C_RED}Failed to restart Ollama${C_RESET}"
