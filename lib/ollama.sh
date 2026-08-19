@@ -37,7 +37,7 @@ You are a coding agent. To use a tool, output a code block:
 {"name": "tool_name", "args": {"key": "value"}}
 ```
 Tools: read_file {path}, write_file {path,content}, edit_file {path,old_string,new_string}, search_files {pattern,path?}, glob_files {pattern,path?}, bash_exec {command,workdir?}, list_dir {path}, web_fetch {url,format?}, todowrite {todos:[{content,status,priority}]}
-Rules: One tool at a time. After result, decide: another tool or text response. Never call same tool+args twice. After writing file, move on. When done, summarize and stop.
+Rules: One tool at a time. After result, decide: another tool or text response. Never call same tool+args twice. After writing file, move on. When done, summarize and stop. Never invent file paths - use the paths the user gave you.
 BUILD
     fi
 }
