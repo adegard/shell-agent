@@ -4,7 +4,9 @@ Local coding assistant for **Termux on Android**. Opencode-style workflow powere
 
 Inspired by [opencode](https://opencode.ai) — brings the same agent loop to your terminal.
 
-## One-line install (Termux)
+## One-line install
+
+### Termux (Android)
 
 Paste this into Termux:
 
@@ -13,6 +15,26 @@ pkg update -y && pkg install -y git && git clone https://github.com/adegard/shel
 ```
 
 That's it. It installs Ollama, pulls a coding model, and sets up the agent.
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/adegard/shell-agent.git
+cd shell-agent
+.\setup-windows.ps1
+```
+
+Or skip Ollama, just install agent for cloud API:
+```powershell
+.\setup-windows.ps1 -CloudOnly
+```
+
+**Requirements:** Git for Windows (includes Git Bash). Ollama installed automatically.
+
+**Quick run without install:**
+```batch
+agent.bat "write a hello world script"
+```
 
 ## After install
 
