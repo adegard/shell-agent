@@ -26,6 +26,8 @@ FRESH_SESSION=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -m|--model) OLLAMA_MODEL="$2"; shift 2 ;;
+        -c|--cloud) USE_CLOUD=1; shift ;;
+        --provider) PROVIDER="$2"; shift 2 ;;
         -d|--debug) export DEBUG=1; shift ;;
         --fresh) FRESH_SESSION=1; shift ;;
         -t|--test)
@@ -204,7 +206,11 @@ run_agent() {
     fi
 
     echo -e "${mode_label}${C_BOLD}${C_CYAN}shell-agent${C_RESET} ${C_DIM}v${AGENT_VERSION}${C_RESET}"
-    echo -e "${C_DIM}model: ${OLLAMA_MODEL} | workspace: ${WORKSPACE}${C_RESET}"
+    if [[ "$USE_CLOUD" -eq 1 ]]; then
+        echo -e "${C_DIM}model: ${CLOUD_MODEL} (cloud) | workspace: ${WORKSPACE}${C_RESET}"
+    else
+        echo -e "${C_DIM}model: ${OLLAMA_MODEL} | workspace: ${WORKSPACE}${C_RESET}"
+    fi
     echo ""
 
     build_tools_json
@@ -223,12 +229,21 @@ run_agent() {
         echo -ne "\r${C_DIM}[${iteration}/${MAX_ITERATIONS}] thinking...${C_RESET}  " >&2
 
         local response
-        response=$(ollama_chat 2>&1) || {
-            echo ""
-            echo -e "${C_RED}Failed to contact Ollama:${C_RESET}"
-            echo "$response" | head -5
-            return 1
-        }
+        if [[ "$USE_CLOUD" -eq 1 ]]; then
+            response=$(cloud_chat 2>&1) || {
+                echo ""
+                echo -e "${C_RED}Failed to contact cloud API:${C_RESET}"
+                echo "$response" | head -5
+                return 1
+            }
+        else
+            response=$(ollama_chat 2>&1) || {
+                echo ""
+                echo -e "${C_RED}Failed to contact Ollama:${C_RESET}"
+                echo "$response" | head -5
+                return 1
+            }
+        fi
 
         if [[ "$response" == ERROR:* ]]; then
             echo ""
@@ -398,7 +413,7 @@ if [[ -n "$SINGLE_PROMPT" ]]; then
     run_agent "$SINGLE_PROMPT"
 else
     echo -e "${C_BOLD}shell-agent${C_RESET} - local coding assistant"
-    echo -e "${C_DIM}Commands: /clear (new session), /plan (toggle plan mode), /undo (revert), /history (show context), quit to exit${C_RESET}"
+    echo -e "${C_DIM}Commands: /clear, /plan, /cloud, /undo, /history, quit to exit${C_RESET}"
     echo ""
 
     # Try to resume previous session (unless --fresh)
@@ -426,6 +441,23 @@ else
             else
                 AGENT_MODE="plan"
                 echo -e "${C_YELLOW}(switched to plan mode — read-only, no edits)${C_RESET}"
+            fi
+            continue
+        fi
+        if [[ "$input" == "/cloud" ]]; then
+            if [[ "$USE_CLOUD" -eq 1 ]]; then
+                USE_CLOUD=0
+                echo -e "${C_DIM}(switched to local Ollama)${C_RESET}"
+            else
+                if [[ -z "$CLOUD_API_KEY" ]]; then
+                    echo -e "${C_RED}Set CLOUD_API_KEY first: export CLOUD_API_KEY=your-key${C_RESET}"
+                    echo "  Also set CLOUD_MODEL and CLOUD_BASE_URL if needed."
+                elif [[ -z "$CLOUD_MODEL" ]]; then
+                    echo -e "${C_RED}Set CLOUD_MODEL first: export CLOUD_MODEL=model-name${C_RESET}"
+                else
+                    USE_CLOUD=1
+                    echo -e "${C_GREEN}(switched to cloud: ${CLOUD_MODEL})${C_RESET}"
+                fi
             fi
             continue
         fi

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# ── Ollama API integration ──────────────────────────────────────────────────
+# ── Ollama API + Cloud integration ──────────────────────────────────────────
 
 OLLAMA_MESSAGES=()
 OLLAMA_TOOLS_JSON=""
+USE_CLOUD=0
 
 # Build the OpenAI-compatible tools JSON from our tool definitions
 build_tools_json() {
@@ -61,6 +62,50 @@ json_escape() {
     s="${s//$'\t'/\\t}"
     s="${s//$'\r'/\\r}"
     printf '"%s"' "$s"
+}
+
+# Chat via OpenAI-compatible cloud API
+cloud_chat() {
+    if [[ -z "$CLOUD_API_KEY" ]]; then
+        echo "ERROR: CLOUD_API_KEY not set. Run: export CLOUD_API_KEY=your-key" >&2
+        return 1
+    fi
+    if [[ -z "$CLOUD_MODEL" ]]; then
+        echo "ERROR: CLOUD_MODEL not set. Run: export CLOUD_MODEL=model-name" >&2
+        return 1
+    fi
+
+    local messages_json
+    messages_json=$(printf '%s\n' "${OLLAMA_MESSAGES[@]}" | jq -s '.' 2>/dev/null || echo "[]")
+
+    local payload
+    payload=$(jq -n \
+        --arg model "$CLOUD_MODEL" \
+        --argjson messages "$messages_json" \
+        '{model: $model, messages: $messages, temperature: 0.1}' 2>/dev/null)
+
+    local response http_code
+    response=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time "${OLLAMA_TIMEOUT}" \
+        "${CLOUD_BASE_URL}/chat/completions" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${CLOUD_API_KEY}" \
+        -d "$payload" 2>&1)
+
+    http_code=$(echo "$response" | tail -1)
+    response=$(echo "$response" | sed '$d')
+
+    if [[ "$http_code" != "200" ]]; then
+        echo "ERROR: Cloud API returned HTTP ${http_code}" >&2
+        echo "$response" | head -5 >&2
+        return 1
+    fi
+
+    if [[ -z "$response" ]] || [[ "$response" == "null" ]]; then
+        echo "ERROR: Empty response from cloud API" >&2
+        return 1
+    fi
+
+    echo "$response"
 }
 
 # Send chat request to Ollama (native API, more reliable than OpenAI compat)

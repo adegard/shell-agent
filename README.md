@@ -110,9 +110,36 @@ Environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama server URL |
-| `OLLAMA_MODEL` | `qwen2.5-coder:3b` | Model to use |
+| `OLLAMA_MODEL` | `qwen2.5-coder:3b` | Local model to use |
 | `WORKSPACE` | current dir | Working directory |
 | `DEBUG` | `0` | Set to `1` for verbose output |
+
+### Cloud API (OpenAI-compatible)
+
+Use cloud models for better quality. Works with OpenAI, OpenRouter, Groq, DeepSeek, etc.
+
+```bash
+# OpenAI
+export CLOUD_API_KEY=sk-...
+export CLOUD_MODEL=gpt-4o
+
+# OpenRouter (access to many models)
+export CLOUD_API_KEY=sk-or-...
+export CLOUD_BASE_URL=https://openrouter.ai/api/v1
+export CLOUD_MODEL=anthropic/claude-sonnet-4
+
+# Groq (fast)
+export CLOUD_API_KEY=gsk_...
+export CLOUD_BASE_URL=https://api.groq.com/openai/v1
+export CLOUD_MODEL=llama-3.1-70b-versatile
+
+# DeepSeek (cheap + good)
+export CLOUD_API_KEY=sk-...
+export CLOUD_BASE_URL=https://api.deepseek.com/v1
+export CLOUD_MODEL=deepseek-coder
+```
+
+Then toggle with `/cloud` command or start with `agent --cloud`.
 
 ## Useful commands
 

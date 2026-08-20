@@ -10,6 +10,12 @@ OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5-coder:3b}"
 OLLAMA_TIMEOUT="${OLLAMA_TIMEOUT:-300}"
 OLLAMA_BIN="${OLLAMA_BIN:-$(command -v ollama 2>/dev/null || echo "${HOME}/.local/bin/ollama")}"
 
+# Cloud API settings (OpenAI-compatible: OpenAI, OpenRouter, Groq, etc.)
+CLOUD_API_KEY="${CLOUD_API_KEY:-}"
+CLOUD_BASE_URL="${CLOUD_BASE_URL:-https://api.openai.com/v1}"
+CLOUD_MODEL="${CLOUD_MODEL:-}"
+PROVIDER="${PROVIDER:-local}"
+
 # Paths
 AGENT_DIR="${HOME}/.shell-agent"
 WORKSPACE="${PWD}"
