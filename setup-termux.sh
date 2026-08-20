@@ -10,7 +10,7 @@ set -euo pipefail
 # Ensure ~/.local/bin is always in PATH
 export PATH="${HOME}/.local/bin:$PATH"
 
-MODEL="${1:-qwen2.5-coder:1.5b}"
+MODEL="${1:-qwen2.5-coder:3b}"
 
 GREEN='\033[32m'
 CYAN='\033[36m'

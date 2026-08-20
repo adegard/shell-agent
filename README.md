@@ -31,7 +31,7 @@ agent --fresh
 
 ## Choose your model
 
-The default model is `qwen2.5-coder:1.5b` (~1 GB). Pick based on your phone's RAM:
+The default model is `qwen2.5-coder:3b` (~1 GB). Pick based on your phone's RAM:
 
 | RAM | Command | Size |
 |-----|---------|------|
@@ -110,7 +110,7 @@ Environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama server URL |
-| `OLLAMA_MODEL` | `qwen2.5-coder:1.5b` | Model to use |
+| `OLLAMA_MODEL` | `qwen2.5-coder:3b` | Model to use |
 | `WORKSPACE` | current dir | Working directory |
 | `DEBUG` | `0` | Set to `1` for verbose output |
 

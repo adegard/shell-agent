@@ -6,7 +6,7 @@ AGENT_VERSION="0.1.0"
 
 # Ollama settings
 OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
-OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5-coder:1.5b}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5-coder:3b}"
 OLLAMA_TIMEOUT="${OLLAMA_TIMEOUT:-300}"
 OLLAMA_BIN="${OLLAMA_BIN:-$(command -v ollama 2>/dev/null || echo "${HOME}/.local/bin/ollama")}"
 
