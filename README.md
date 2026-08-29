@@ -201,3 +201,7 @@ agent.sh                 Main loop — reads input, calls Ollama, dispatches too
 ## License
 
 MIT
+
+---
+
+For an overview of all my other projects, see https://adegard.github.io/blog/
