@@ -8,6 +8,24 @@ Inspired by [opencode](https://opencode.ai) — brings the same agent loop to yo
 
 ## One-line install
 
+### Linux (Debian/Ubuntu, Fedora, Arch, openSUSE, Alpine)
+
+```bash
+git clone https://github.com/adegard/shell-agent.git && bash shell-agent/setup-linux.sh
+```
+
+That installs system dependencies, Ollama, the default model, and the `agent` alias.
+
+| Variant | Command | Effect |
+|---|---|---|
+| Pick a model | `bash shell-agent/setup-linux.sh qwen2.5-coder:7b` | Pulls that model instead of the default |
+| No sudo | `bash shell-agent/setup-linux.sh --user` | Ollama goes to `~/.local/bin`, no root needed |
+| Cloud only | `bash shell-agent/setup-linux.sh --cloud-only` | Skips Ollama entirely, sets up the agent only |
+
+Ollama is auto-started: via its systemd system service if the official installer set one up, otherwise via a `systemctl --user` unit with linger enabled.
+
+**Requirements:** `bash`, `curl`, `jq`, `git` (installed automatically when a supported package manager is found). ~4 GB free disk for Ollama + model.
+
 ### Termux (Android)
 
 Paste this into Termux:
@@ -55,13 +73,15 @@ agent --fresh
 
 ## Choose your model
 
-The default model is `qwen2.5-coder:3b` (~1 GB). Pick based on your phone's RAM:
+The default model is `qwen2.5-coder:3b` (~1 GB). Pick based on your RAM:
 
 | RAM | Command | Size |
 |-----|---------|------|
 | 2-3 GB | `bash setup-termux.sh` | ~1 GB |
 | 4-6 GB | `bash setup-termux.sh qwen2.5-coder:3b` | ~2 GB |
 | 8+ GB | `bash setup-termux.sh qwen2.5-coder:7b` | ~4.4 GB |
+
+The same argument works for the other installers: `bash setup-linux.sh qwen2.5-coder:7b`, `.\setup-windows.ps1 qwen2.5-coder:7b`.
 
 To switch later:
 
@@ -194,6 +214,7 @@ agent.sh                 Main loop — reads input, calls Ollama, dispatches too
 
 ## Requirements
 
+- Linux: `bash`, `curl`, `jq`, `git` + `sudo` (optional, only for system-wide Ollama)
 - [Termux](https://f-droid.org/en/packages/com.termux/) (install from F-Droid, not Play Store)
 - ~2 GB free storage (for Ollama + model)
 - 2+ GB RAM (8 GB recommended for bigger models)
