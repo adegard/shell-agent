@@ -2,7 +2,7 @@
 
 # shell-agent - Work in progress -
 
-Local coding assistant for **Termux on Android**. Opencode-style workflow powered by Ollama — reads, writes, searches, builds, and tests code entirely on your phone. No cloud APIs, no internet needed after setup.
+Local coding assistant multiplatforms. Opencode-style workflow powered by Ollama (but not only) — reads, writes, searches, builds, and tests code entirely on your phone. No cloud APIs, no internet needed after setup.
 
 Inspired by [opencode](https://opencode.ai) — brings the same agent loop to your terminal.
 
