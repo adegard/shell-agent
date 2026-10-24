@@ -1,10 +1,12 @@
 [![Buy me a coffee](https://cdn.buymeacoffee.com/buttons/v2/default-red.png)](https://www.buymeacoffee.com/adegard)
 
-# shell-agent - Work in progress -
+# shell-agent 
 
-Local coding assistant multiplatforms. Opencode-style workflow powered by Ollama (but not only) — reads, writes, searches, builds, and tests code entirely on your phone. No cloud APIs, no internet needed after setup.
+***- Work in progress -***
 
-Inspired by [opencode](https://opencode.ai) — brings the same agent loop to your terminal.
+Local coding assistant multiplatforms. Opencode-style workflow powered by Ollama (but not only) — reads, writes, searches, builds, and tests code. No cloud APIs, no internet needed after setup.
+
+Inspired by [opencode](https://opencode.ai) — brings similar agent loop to your terminal.
 
 ## One-line install
 
@@ -167,17 +169,17 @@ Use cloud models for better quality. Works with OpenAI, OpenRouter, Groq, DeepSe
 export CLOUD_API_KEY=sk-...
 export CLOUD_MODEL=gpt-4o
 
-# OpenRouter (access to many models)
+# OpenRouter 
 export CLOUD_API_KEY=sk-or-...
 export CLOUD_BASE_URL=https://openrouter.ai/api/v1
 export CLOUD_MODEL=anthropic/claude-sonnet-4
 
-# Groq (fast)
+# Groq 
 export CLOUD_API_KEY=gsk_...
 export CLOUD_BASE_URL=https://api.groq.com/openai/v1
 export CLOUD_MODEL=llama-3.1-70b-versatile
 
-# DeepSeek (cheap + good)
+# DeepSeek
 export CLOUD_API_KEY=sk-...
 export CLOUD_BASE_URL=https://api.deepseek.com/v1
 export CLOUD_MODEL=deepseek-coder
